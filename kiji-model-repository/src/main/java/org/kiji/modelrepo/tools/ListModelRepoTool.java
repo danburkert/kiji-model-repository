@@ -27,7 +27,7 @@ import com.google.common.collect.Sets;
 
 import org.kiji.common.flags.Flag;
 import org.kiji.modelrepo.KijiModelRepository;
-import org.kiji.modelrepo.ModelLifeCycle;
+import org.kiji.modelrepo.ModelContainer;
 import org.kiji.schema.KConstants;
 import org.kiji.schema.Kiji;
 import org.kiji.schema.KijiURI;
@@ -63,11 +63,8 @@ public final class ListModelRepoTool extends BaseTool implements KijiModelRepoTo
   @Flag(name = "message", usage = "Print the messages of models.")
   private boolean mMessage = false;
 
-  @Flag(name = "definition", usage = "Print the model definition.")
-  private boolean mDefinition = false;
-
-  @Flag(name = "environment", usage = "Print the model environment.")
-  private boolean mEnvironment = false;
+  @Flag(name = "model-container", usage = "Print the model container.")
+  private boolean mModelContainer = false;
 
   @Flag(name = "max-versions",
       usage = "Max number of versions per cell to display ('all' for all versions). Default is 1.")
@@ -123,19 +120,16 @@ public final class ListModelRepoTool extends BaseTool implements KijiModelRepoTo
   private Set<String> getFieldsToPrint() {
     final Set<String> fieldsToPrint = Sets.newHashSet();
     if (mLocation) {
-      fieldsToPrint.add(ModelLifeCycle.LOCATION_KEY);
+      fieldsToPrint.add(ModelContainer.LOCATION_KEY);
     }
-    if (mDefinition) {
-      fieldsToPrint.add(ModelLifeCycle.DEFINITION_KEY);
-    }
-    if (mEnvironment) {
-      fieldsToPrint.add(ModelLifeCycle.ENVIRONMENT_KEY);
+    if (mModelContainer) {
+      fieldsToPrint.add(ModelContainer.MODEL_CONTAINER_KEY);
     }
     if (mProductionReady) {
-      fieldsToPrint.add(ModelLifeCycle.PRODUCTION_READY_KEY);
+      fieldsToPrint.add(ModelContainer.PRODUCTION_READY_KEY);
     }
     if (mMessage) {
-      fieldsToPrint.add(ModelLifeCycle.MESSAGES_KEY);
+      fieldsToPrint.add(ModelContainer.MESSAGES_KEY);
     }
     return fieldsToPrint;
   }
@@ -156,13 +150,13 @@ public final class ListModelRepoTool extends BaseTool implements KijiModelRepoTo
     final Set<String> fieldsToPrint = this.getFieldsToPrint();
 
     // Query the model repository for a list of entries.
-    final Set<ModelLifeCycle> setOfModels = modelRepository.getModelLifeCycles(
+    final Set<ModelContainer> setOfModels = modelRepository.getModelLifeCycles(
         fieldsToPrint,
         mMaxVersionsInteger,
         mProductionReadyOnly);
 
     // Iterate through list of model row data and appropriately pretty print fields.
-    for (final ModelLifeCycle model : setOfModels) {
+    for (final ModelContainer model : setOfModels) {
       if (isMatch(model)) {
         getPrintStream().println(model.toString());
       }
@@ -181,7 +175,7 @@ public final class ListModelRepoTool extends BaseTool implements KijiModelRepoTo
    * @return true if the lifecycle's name and version matches what the user requested. If the user
    *         did not request any name/version specifics, then it will return true.
    */
-  private boolean isMatch(ModelLifeCycle lifecycle) {
+  private boolean isMatch(ModelContainer lifecycle) {
     boolean isMatch = true;
     if (mVersionPattern != null) {
       isMatch &= lifecycle.getArtifactName().getVersion().toString()

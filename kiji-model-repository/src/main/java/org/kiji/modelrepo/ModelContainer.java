@@ -36,44 +36,36 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.codehaus.plexus.util.FileUtils;
+import org.kiji.modelrepo.avro.KijiModelContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
-import org.kiji.modeling.avro.AvroColumnFamilyOutputSpec;
-import org.kiji.modeling.avro.AvroKijiSingleColumnOutputSpec;
-import org.kiji.modeling.avro.AvroModelDefinition;
-import org.kiji.modeling.avro.AvroModelEnvironment;
-import org.kiji.modeling.avro.AvroQualifiedColumnOutputSpec;
 import org.kiji.modelrepo.artifactvalidator.ArtifactValidator;
 import org.kiji.modelrepo.artifactvalidator.WarArtifactValidator;
 import org.kiji.schema.Kiji;
-import org.kiji.schema.KijiColumnName;
 import org.kiji.schema.KijiRowData;
-import org.kiji.schema.KijiURI;
 import org.kiji.schema.util.ProtocolVersion;
-import org.kiji.scoring.KijiFreshnessManager;
-import org.kiji.scoring.lib.server.ScoringServerScoreFunction;
 
 /**
  * Class to work with model artifact metadata sourced from the model repository table.
  */
-public class ModelLifeCycle {
+public class ModelContainer {
 
-  public static final String DEFINITION_KEY = "definition";
-  public static final String ENVIRONMENT_KEY = "environment";
   public static final String LOCATION_KEY = "location";
   public static final String MESSAGES_KEY = "message";
   public static final String PRODUCTION_READY_KEY = "production_ready";
   public static final String UPLOADED_KEY = "uploaded";
   public static final String MODEL_REPO_FAMILY = "model";
 
-  private static final Logger LOG = LoggerFactory.getLogger(ModelLifeCycle.class);
+  public static final String MODEL_CONTAINER_KEY = "model_container";
+
+  private static final Logger LOG = LoggerFactory.getLogger(ModelContainer.class);
 
   private final boolean mUploaded;
   private final ArtifactName mArtifact;
   private final String mLocation;
-  private final AvroModelDefinition mDefinition;
-  private final AvroModelEnvironment mEnvironment;
+  private final KijiModelContainer mModelContainer;
   private final Map<Long, String> mMessages = Maps.newTreeMap();
   private final TreeMap<Long, Boolean> mProductionReady = Maps.newTreeMap();
 
@@ -89,8 +81,8 @@ public class ModelLifeCycle {
    * @param baseURI is the base URI of the underlying storage layer.
    * @throws IOException if the row data can not be properly accessed to retrieve values.
    */
-  public ModelLifeCycle(final KijiRowData model,
-      final Set<String> fieldsToRead, URI baseURI) throws IOException {
+  public ModelContainer(final KijiRowData model,
+                        final Set<String> fieldsToRead, URI baseURI) throws IOException {
 
     // Load name and version.
     mArtifact = new ArtifactName(
@@ -109,25 +101,14 @@ public class ModelLifeCycle {
     if (!mUploaded) {
       throw new IOException("Requested model was not uploaded, therefore not deployed.");
     }
-    if (fieldsToRead.contains(DEFINITION_KEY)) {
+    if (fieldsToRead.contains(MODEL_CONTAINER_KEY)) {
       try {
-        mDefinition =
-            (AvroModelDefinition) model.getMostRecentValue(MODEL_REPO_FAMILY, DEFINITION_KEY);
+        mModelContainer = model.getMostRecentValue(MODEL_REPO_FAMILY, MODEL_CONTAINER_KEY);
       } catch (final Exception e) {
-        throw new IOException("Following field was not extracted: " + DEFINITION_KEY);
+        throw new IOException("Following field was not extracted: " + MODEL_CONTAINER_KEY);
       }
     } else {
-      mDefinition = null;
-    }
-    if (fieldsToRead.contains(ENVIRONMENT_KEY)) {
-      try {
-        mEnvironment =
-            (AvroModelEnvironment) model.getMostRecentValue(MODEL_REPO_FAMILY, ENVIRONMENT_KEY);
-      } catch (final Exception e) {
-        throw new IOException("Following field was not extracted: " + ENVIRONMENT_KEY);
-      }
-    } else {
-      mEnvironment = null;
+      mModelContainer = null;
     }
     if (fieldsToRead.contains(LOCATION_KEY)) {
       try {
@@ -183,21 +164,12 @@ public class ModelLifeCycle {
   }
 
   /**
-   * Gets lifecycle's model definition.
+   * Gets the model container.
    *
-   * @return model definition.
+   * @return model container.
    */
-  public AvroModelDefinition getDefinition() {
-    return mDefinition;
-  }
-
-  /**
-   * Gets lifecycle's model environment.
-   *
-   * @return model environment.
-   */
-  public AvroModelEnvironment getEnvironment() {
-    return mEnvironment;
+  public KijiModelContainer getModelContainer() {
+    return mModelContainer;
   }
 
   /**
@@ -228,11 +200,8 @@ public class ModelLifeCycle {
     if (null != getLocation()) {
       modelStringBuilder.append(String.format("%s: %s%n", "location", getLocation()));
     }
-    if (null != getDefinition()) {
-      modelStringBuilder.append(String.format("%s: %s%n", "definition", getDefinition()));
-    }
-    if (null != getEnvironment()) {
-      modelStringBuilder.append(String.format("%s: %s%n", "environment", getEnvironment()));
+    if (null != getModelContainer()) {
+      modelStringBuilder.append(String.format("%s: %s%n", "model_container", getModelContainer()));
     }
 
     // Merge the sorted lists of production_ready and message flags and pretty print.
@@ -398,50 +367,52 @@ public class ModelLifeCycle {
       final boolean instantiateClasses,
       final boolean setupClasses
   ) throws IOException {
-    Preconditions.checkState(mProductionReady.lastEntry().getValue(),
-        "Model must be production ready to be attached as a Freshener.");
-    final AvroKijiSingleColumnOutputSpec outputSpec =
-        mEnvironment.getScoreEnvironment().getOutputSpec();
-
-    final String tableName = KijiURI.newBuilder(outputSpec.getTableUri()).build().getTable();
-
-    final KijiColumnName columnName;
-    Object outputColumn = outputSpec.getOutputColumn();
-    if (outputColumn instanceof AvroQualifiedColumnOutputSpec) {
-      String family = ((AvroQualifiedColumnOutputSpec) outputColumn).getFamily();
-      String qualifier = ((AvroQualifiedColumnOutputSpec) outputColumn).getQualifier();
-      columnName = new KijiColumnName(family, qualifier);
-    } else if (outputColumn instanceof AvroColumnFamilyOutputSpec) {
-      String family = ((AvroColumnFamilyOutputSpec) outputColumn).getFamily();
-      columnName = new KijiColumnName(family);
-    } else {
-      throw new IOException("Error getting output column name");
-    }
-
-    final String scoreFunctionClass = ScoringServerScoreFunction.class.getName();
-    final Map<String, String> innerParams = Maps.newHashMap(parameters);
-    // TODO eliminate this hard coding.
-    final byte[] baseURLBytes = kiji.getMetaTable().getValue(
-        KijiModelRepository.MODEL_REPO_TABLE_NAME,
-        KijiModelRepository.SCORING_SERVER_URL_METATABLE_KEY);
-    innerParams.put(ScoringServerScoreFunction.SCORING_SERVER_BASE_URL_PARAMETER_KEY,
-        new String(baseURLBytes));
-    innerParams.put(ScoringServerScoreFunction.SCORING_SERVER_MODEL_ID_PARAMETER_KEY,
-        mArtifact.getFullyQualifiedName());
-
-    final KijiFreshnessManager manager = KijiFreshnessManager.create(kiji);
-    try {
-      manager.registerFreshener(
-          tableName,
-          columnName,
-          policyClass,
-          scoreFunctionClass,
-          innerParams,
-          overwriteExisting,
-          instantiateClasses,
-          setupClasses);
-    } finally {
-      manager.close();
-    }
+    // TODO: ajprax
+    throw new NotImplementedException();
+//    Preconditions.checkState(mProductionReady.lastEntry().getValue(),
+//        "Model must be production ready to be attached as a Freshener.");
+//    final AvroKijiSingleColumnOutputSpec outputSpec =
+//        mModelContainer.getScoreEnvironment().getOutputSpec();
+//
+//    final String tableName = KijiURI.newBuilder(outputSpec.getTableUri()).build().getTable();
+//
+//    final KijiColumnName columnName;
+//    Object outputColumn = outputSpec.getOutputColumn();
+//    if (outputColumn instanceof AvroQualifiedColumnOutputSpec) {
+//      String family = ((AvroQualifiedColumnOutputSpec) outputColumn).getFamily();
+//      String qualifier = ((AvroQualifiedColumnOutputSpec) outputColumn).getQualifier();
+//      columnName = new KijiColumnName(family, qualifier);
+//    } else if (outputColumn instanceof AvroColumnFamilyOutputSpec) {
+//      String family = ((AvroColumnFamilyOutputSpec) outputColumn).getFamily();
+//      columnName = new KijiColumnName(family);
+//    } else {
+//      throw new IOException("Error getting output column name");
+//    }
+//
+//    final String scoreFunctionClass = ScoringServerScoreFunction.class.getName();
+//    final Map<String, String> innerParams = Maps.newHashMap(parameters);
+//    // TODO eliminate this hard coding.
+//    final byte[] baseURLBytes = kiji.getMetaTable().getValue(
+//        KijiModelRepository.MODEL_REPO_TABLE_NAME,
+//        KijiModelRepository.SCORING_SERVER_URL_METATABLE_KEY);
+//    innerParams.put(ScoringServerScoreFunction.SCORING_SERVER_BASE_URL_PARAMETER_KEY,
+//        new String(baseURLBytes));
+//    innerParams.put(ScoringServerScoreFunction.SCORING_SERVER_MODEL_ID_PARAMETER_KEY,
+//        mArtifact.getFullyQualifiedName());
+//
+//    final KijiFreshnessManager manager = KijiFreshnessManager.create(kiji);
+//    try {
+//      manager.registerFreshener(
+//          tableName,
+//          columnName,
+//          policyClass,
+//          scoreFunctionClass,
+//          innerParams,
+//          overwriteExisting,
+//          instantiateClasses,
+//          setupClasses);
+//    } finally {
+//      manager.close();
+//    }
   }
 }

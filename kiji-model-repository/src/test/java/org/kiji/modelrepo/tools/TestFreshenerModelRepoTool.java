@@ -82,7 +82,7 @@ public class TestFreshenerModelRepoTool extends KijiClientTest {
 
   private List<String> getBaselineArgs() throws IOException {
     return Lists.newArrayList(
-        "--definition=src/test/resources/org/kiji/samplelifecycle/model_definition.json"
+        "--definition=src/test/resources/org/kiji/samplelifecycle/model_container.json"
         , "--environment=src/test/resources/org/kiji/samplelifecycle/model_environment.json"
         , "--message=Uploading Artifact"
         , "--kiji=" + getKiji().getURI().toString());

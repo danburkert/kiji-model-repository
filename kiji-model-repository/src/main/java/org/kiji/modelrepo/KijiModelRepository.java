@@ -32,11 +32,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import org.apache.avro.Schema;
+import org.kiji.modelrepo.avro.KijiModelContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.kiji.modeling.avro.AvroModelDefinition;
-import org.kiji.modeling.avro.AvroModelEnvironment;
 import org.kiji.modelrepo.packager.Packager;
 import org.kiji.modelrepo.packager.WarPackager;
 import org.kiji.modelrepo.uploader.ArtifactUploader;
@@ -140,14 +139,14 @@ public final class KijiModelRepository implements Closeable {
 
   private static final KijiRowFilter UPLOADED_MODEL_FILTER =
       new ColumnValueEqualsRowFilter(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.UPLOADED_KEY,
+          ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.UPLOADED_KEY,
           new DecodedCell<Boolean>(Schema.create(Schema.Type.BOOLEAN), true));
 
   private static final KijiRowFilter PRODUCTION_READY_FILTER =
       new ColumnValueEqualsRowFilter(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.PRODUCTION_READY_KEY,
+          ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.PRODUCTION_READY_KEY,
           new DecodedCell<Boolean>(Schema.create(Schema.Type.BOOLEAN), true));
 
   /**
@@ -404,10 +403,10 @@ public final class KijiModelRepository implements Closeable {
     try {
       // Allocate and lock row by setting "model:uploaded" as false.
       putter.begin(eid);
-      putter.put(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.UPLOADED_KEY, false);
+      putter.put(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.UPLOADED_KEY, false);
       // Check that row doesn't exist (check uploaded cell) and commit.
-      if (!putter.checkAndCommit(ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.UPLOADED_KEY,
+      if (!putter.checkAndCommit(ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.UPLOADED_KEY,
           null)) {
         throw new IllegalArgumentException(
             String.format("Error Version %s exists.", artifact.getVersion().toCanonicalString()));
@@ -421,8 +420,7 @@ public final class KijiModelRepository implements Closeable {
    * Writes to a reserved row in the model repository table.
    *
    * @param artifact name of the model lifecycle.
-   * @param definition AvroModelDefinition of model lifecycle
-   * @param environment AvroModelEnvironment of model lifecycle
+   * @param modelContainer configuration.
    * @param location where the code artifact is uploaded.
    * @param productionReady is true iff model lifecycle is ready for scoring
    * @param message (optional) latest update message of the model lifecycle.
@@ -430,8 +428,7 @@ public final class KijiModelRepository implements Closeable {
    */
   private void writeRow(
       final ArtifactName artifact,
-      final AvroModelDefinition definition,
-      final AvroModelEnvironment environment,
+      final KijiModelContainer modelContainer,
       final String location,
       final boolean productionReady,
       final String message) throws IOException {
@@ -441,28 +438,24 @@ public final class KijiModelRepository implements Closeable {
           artifact.getVersion().toCanonicalString());
       putter.begin(eid);
       putter.put(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.DEFINITION_KEY,
-          definition);
+          ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.MODEL_CONTAINER_KEY,
+          modelContainer);
       putter.put(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.ENVIRONMENT_KEY,
-          environment);
-      putter.put(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.LOCATION_KEY,
+          ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.LOCATION_KEY,
           location);
       putter.put(
-          ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.PRODUCTION_READY_KEY,
+          ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.PRODUCTION_READY_KEY,
           productionReady);
       if (null != message) {
-        putter.put(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.MESSAGES_KEY, message);
+        putter.put(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.MESSAGES_KEY, message);
       }
       // Enable this entry.
-      putter.put(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.UPLOADED_KEY, true);
+      putter.put(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.UPLOADED_KEY, true);
       // Check that the uploaded field is false and commit.
-      putter.checkAndCommit(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.UPLOADED_KEY, false);
+      putter.checkAndCommit(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.UPLOADED_KEY, false);
     } finally {
       putter.close();
     }
@@ -488,8 +481,7 @@ public final class KijiModelRepository implements Closeable {
    * @param artifact name of the model being deployed.
    * @param artifactFile is the actual artifact to upload.
    * @param dependencies are the third-party dependencies to include in the artifact
-   * @param definition AvroModelDefinition of model lifecycle
-   * @param environment AvroModelEnvironment of model lifecycle
+   * @param modelContainer configuration
    * @param productionReady is true iff model lifecycle is ready for scoring
    * @param message (optional) latest update message of the model lifecycle
    * @throws IOException if model lifecycle cannot be deployed.
@@ -499,8 +491,7 @@ public final class KijiModelRepository implements Closeable {
       final ArtifactName artifact,
       final File artifactFile,
       final List<File> dependencies,
-      final AvroModelDefinition definition,
-      final AvroModelEnvironment environment,
+      final KijiModelContainer modelContainer,
       final boolean productionReady,
       final String message) throws IOException {
     // CSON: ParameterNumberCheck
@@ -541,7 +532,7 @@ public final class KijiModelRepository implements Closeable {
     }
 
     // Put entry to the model repository table.
-    writeRow(versionedArtifact, definition, environment, location, productionReady, message);
+    writeRow(versionedArtifact, modelContainer, location, productionReady, message);
   }
 
   /**
@@ -551,8 +542,7 @@ public final class KijiModelRepository implements Closeable {
    * @param sourceArtifact name of the the existing model lifecycle
    *        whose package contains the code to associate with this deployment
    *        This is specified if artifactFile and dependencies are null.
-   * @param definition AvroModelDefinition of model lifecycle.
-   * @param environment AvroModelEnvironment of model lifecycle.
+   * @param modelContainer configuration.
    * @param productionReady is true iff model lifecycle is ready for scoring.
    * @param message (optional) latest update message of the model lifecycle.
    * @throws IOException if model lifecycle cannot be deployed.
@@ -561,8 +551,7 @@ public final class KijiModelRepository implements Closeable {
   public void deployModelLifecycle(
       final ArtifactName artifact,
       final ArtifactName sourceArtifact,
-      final AvroModelDefinition definition,
-      final AvroModelEnvironment environment,
+      final KijiModelContainer modelContainer,
       final boolean productionReady,
       final String message) throws IOException {
     // CSON: ParameterNumberCheck
@@ -584,14 +573,14 @@ public final class KijiModelRepository implements Closeable {
     reserveNewRow(versionedArtifact);
 
     // Acquire appropriate existing artifact's location
-    final ModelLifeCycle existingArtifact = getModelLifeCycle(sourceArtifact);
+    final ModelContainer existingArtifact = getModelLifeCycle(sourceArtifact);
     Preconditions.checkNotNull(existingArtifact.getLocation(), String.format(
         "Could not ascertain model location field of specified existing artifact: %s",
         sourceArtifact));
     final String location = existingArtifact.getLocation();
 
     // Put entry to the model repository table.
-    writeRow(versionedArtifact, definition, environment, location, productionReady, message);
+    writeRow(versionedArtifact, modelContainer, location, productionReady, message);
   }
 
   /**
@@ -616,14 +605,14 @@ public final class KijiModelRepository implements Closeable {
     final AtomicKijiPutter putter = mKijiTable.getWriterFactory().openAtomicPutter();
     try {
       putter.begin(eid);
-      putter.put(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.PRODUCTION_READY_KEY,
+      putter.put(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.PRODUCTION_READY_KEY,
           productionReady);
       if (null != message) {
-        putter.put(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.MESSAGES_KEY, message);
+        putter.put(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.MESSAGES_KEY, message);
       }
       // Check that row exists and "model:uploaded" flag is true.
-      if (!putter.checkAndCommit(ModelLifeCycle.MODEL_REPO_FAMILY,
-          ModelLifeCycle.UPLOADED_KEY,
+      if (!putter.checkAndCommit(ModelContainer.MODEL_REPO_FAMILY,
+          ModelContainer.UPLOADED_KEY,
           true)) {
         throw new IllegalArgumentException(
             String.format("Model %s-%s does not exist.",
@@ -684,7 +673,7 @@ public final class KijiModelRepository implements Closeable {
    * @return a single artifact.
    * @throws IOException if there is an exception fetching data.
    */
-  public ModelLifeCycle getModelLifeCycle(final ArtifactName artifact) throws IOException {
+  public ModelContainer getModelLifeCycle(final ArtifactName artifact) throws IOException {
     return getModelLifeCycle(artifact, null);
   }
 
@@ -696,15 +685,15 @@ public final class KijiModelRepository implements Closeable {
    * @return a single artifact.
    * @throws IOException if there is an exception fetching data.
    */
-  public ModelLifeCycle getModelLifeCycle(
+  public ModelContainer getModelLifeCycle(
       final ArtifactName artifact,
       Set<String> fields) throws IOException {
     if (null == fields) {
-      fields = Sets.newHashSet(ModelLifeCycle.DEFINITION_KEY,
-          ModelLifeCycle.ENVIRONMENT_KEY,
-          ModelLifeCycle.LOCATION_KEY,
-          ModelLifeCycle.PRODUCTION_READY_KEY,
-          ModelLifeCycle.MESSAGES_KEY);
+      fields = Sets.newHashSet(
+          ModelContainer.MODEL_CONTAINER_KEY,
+          ModelContainer.LOCATION_KEY,
+          ModelContainer.PRODUCTION_READY_KEY,
+          ModelContainer.MESSAGES_KEY);
     }
     final KijiDataRequest dataRequest = KijiDataRequest.create("model");
     final KijiTableReader reader = mKijiTable.openTableReader();
@@ -712,7 +701,7 @@ public final class KijiModelRepository implements Closeable {
       final EntityId eid = mKijiTable.getEntityId(artifact.getName(),
           artifact.getVersion().toCanonicalString());
       final KijiRowData returnRow = reader.get(eid, dataRequest);
-      return new ModelLifeCycle(returnRow, fields, mCurrentBaseStorageURI);
+      return new ModelContainer(returnRow, fields, mCurrentBaseStorageURI);
     } finally {
       reader.close();
     }
@@ -737,8 +726,8 @@ public final class KijiModelRepository implements Closeable {
     dataRequestBuilder.addColumns(dataRequestBuilder
         .newColumnsDef()
         .withMaxVersions(Integer.MAX_VALUE)
-        .add(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.LOCATION_KEY)
-        .add(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.UPLOADED_KEY));
+        .add(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.LOCATION_KEY)
+        .add(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.UPLOADED_KEY));
     // Filter out all incomplete models.
     final KijiScannerOptions options = new KijiScannerOptions();
     options.setKijiRowFilter(KijiModelRepository.UPLOADED_MODEL_FILTER);
@@ -746,8 +735,8 @@ public final class KijiModelRepository implements Closeable {
     try {
       for (KijiRowData row : scanner) {
         // Proper construction of ModelArtifact requires UPLOADED_KEY.
-        final ModelLifeCycle model = new ModelLifeCycle(row,
-            Sets.newHashSet(ModelLifeCycle.LOCATION_KEY), mCurrentBaseStorageURI);
+        final ModelContainer model = new ModelContainer(row,
+            Sets.newHashSet(ModelContainer.LOCATION_KEY), mCurrentBaseStorageURI);
         issues.addAll(model.checkModelLocation(download));
       }
     } finally {
@@ -767,13 +756,13 @@ public final class KijiModelRepository implements Closeable {
    * @return a set of model lifecycles from the model repository table.
    * @throws IOException when table can not be properly scanned.
    */
-  public Set<ModelLifeCycle> getModelLifeCycles(
+  public Set<ModelContainer> getModelLifeCycles(
       Set<String> fields,
       final int maxVersions,
       final boolean productionReadyOnly) throws IOException {
     Preconditions.checkArgument(maxVersions >= 0);
 
-    final Set<ModelLifeCycle> setOfModels = Sets.newLinkedHashSet();
+    final Set<ModelContainer> setOfModels = Sets.newLinkedHashSet();
     final KijiTableReader reader = mKijiTable.openTableReader();
     final KijiDataRequestBuilder dataRequestBuilder = KijiDataRequest.builder();
     // We want to get every existing model in the table.
@@ -781,17 +770,17 @@ public final class KijiModelRepository implements Closeable {
     final ColumnsDef columns = dataRequestBuilder
         .newColumnsDef()
         .withMaxVersions(maxVersions)
-        .add(new KijiColumnName(ModelLifeCycle.MODEL_REPO_FAMILY, ModelLifeCycle.UPLOADED_KEY));
+        .add(new KijiColumnName(ModelContainer.MODEL_REPO_FAMILY, ModelContainer.UPLOADED_KEY));
     // Add all other fields requested by the user.
     if (null == fields) {
-      fields = Sets.newHashSet(ModelLifeCycle.DEFINITION_KEY,
-          ModelLifeCycle.ENVIRONMENT_KEY,
-          ModelLifeCycle.LOCATION_KEY,
-          ModelLifeCycle.PRODUCTION_READY_KEY,
-          ModelLifeCycle.MESSAGES_KEY);
+      fields = Sets.newHashSet(
+          ModelContainer.MODEL_CONTAINER_KEY,
+          ModelContainer.LOCATION_KEY,
+          ModelContainer.PRODUCTION_READY_KEY,
+          ModelContainer.MESSAGES_KEY);
     }
     for (final String field : fields) {
-      columns.add(new KijiColumnName(ModelLifeCycle.MODEL_REPO_FAMILY, field));
+      columns.add(new KijiColumnName(ModelContainer.MODEL_REPO_FAMILY, field));
     }
     dataRequestBuilder.addColumns(columns);
 
@@ -809,7 +798,7 @@ public final class KijiModelRepository implements Closeable {
     final KijiRowScanner scanner = reader.getScanner(dataRequestBuilder.build(), options);
     try {
       for (final KijiRowData row : scanner) {
-        setOfModels.add(new ModelLifeCycle(row, fields, mCurrentBaseStorageURI));
+        setOfModels.add(new ModelContainer(row, fields, mCurrentBaseStorageURI));
       }
     } finally {
       scanner.close();

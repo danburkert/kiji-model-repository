@@ -30,10 +30,9 @@ import com.google.common.collect.Lists;
 import org.apache.commons.io.IOUtils;
 
 import org.kiji.common.flags.Flag;
-import org.kiji.modeling.avro.AvroModelDefinition;
-import org.kiji.modeling.avro.AvroModelEnvironment;
 import org.kiji.modelrepo.ArtifactName;
 import org.kiji.modelrepo.KijiModelRepository;
+import org.kiji.modelrepo.avro.KijiModelContainer;
 import org.kiji.modelrepo.depresolver.DependencyResolver;
 import org.kiji.modelrepo.depresolver.DependencyResolverFactory;
 import org.kiji.schema.KConstants;
@@ -158,16 +157,14 @@ public class DeployModelRepoTool extends BaseTool implements KijiModelRepoTool {
     final Kiji kiji = Kiji.Factory.open(mInstanceURI);
     final KijiModelRepository kijiModelRepository = KijiModelRepository.open(kiji);
 
-    final AvroModelDefinition avroModelDefinition = readAvroModelDefinition(mDefinitionFlag);
-    final AvroModelEnvironment avroModelEnvironment = readAvroModelEnvironment(mEnvironmentFlag);
+    final KijiModelContainer modelContainer = readKijiModelContainer(mDefinitionFlag);
 
     try {
       if (mExistingArtifact) {
         kijiModelRepository.deployModelLifecycle(
             mArtifact,
             mSourceArtifact,
-            avroModelDefinition,
-            avroModelEnvironment,
+            modelContainer,
             mProductionReady,
             mMessage);
       } else {
@@ -175,8 +172,7 @@ public class DeployModelRepoTool extends BaseTool implements KijiModelRepoTool {
             mArtifact,
             mArtifactPath,
             resolvedDeps,
-            avroModelDefinition,
-            avroModelEnvironment,
+            modelContainer,
             mProductionReady,
             mMessage);
       }
@@ -195,21 +191,9 @@ public class DeployModelRepoTool extends BaseTool implements KijiModelRepoTool {
    *
    * @throws IOException if there is an error reading the definition from the specified file.
    */
-  private static AvroModelDefinition readAvroModelDefinition(String filename) throws IOException {
+  private static KijiModelContainer readKijiModelContainer(String filename) throws IOException {
     String json = readJSONFromFile(filename);
-    return (AvroModelDefinition) FromJson.fromJsonString(json, AvroModelDefinition.SCHEMA$);
-  }
-
-  /**
-   * Reads an AvroModelEnvironment from the specified file.
-   *
-   * @param filename containing the AvroModelEnvironment.
-   * @return AvroModelEnvironment parsed from the file.
-   * @throws IOException if there is an error reading the environment from the specified file.
-   */
-  private static AvroModelEnvironment readAvroModelEnvironment(String filename) throws IOException {
-    String json = readJSONFromFile(filename);
-    return (AvroModelEnvironment) FromJson.fromJsonString(json, AvroModelEnvironment.SCHEMA$);
+    return (KijiModelContainer) FromJson.fromJsonString(json, KijiModelContainer.getClassSchema());
   }
 
   /**

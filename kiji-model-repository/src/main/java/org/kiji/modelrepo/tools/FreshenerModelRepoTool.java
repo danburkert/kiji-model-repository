@@ -28,7 +28,7 @@ import com.google.gson.Gson;
 import org.kiji.common.flags.Flag;
 import org.kiji.modelrepo.ArtifactName;
 import org.kiji.modelrepo.KijiModelRepository;
-import org.kiji.modelrepo.ModelLifeCycle;
+import org.kiji.modelrepo.ModelContainer;
 import org.kiji.schema.Kiji;
 import org.kiji.schema.KijiURI;
 import org.kiji.schema.tools.BaseTool;
@@ -142,11 +142,12 @@ public class FreshenerModelRepoTool extends BaseTool implements KijiModelRepoToo
         final boolean setup = (null != mSetupFlag) ? mSetupFlag : false;
         final Map<String, String> parameters = (null != mParametersFlag)
             ? mapFromJSON(mParametersFlag) : Collections.<String, String>emptyMap();
-        final ModelLifeCycle lifeCycle = repo.getModelLifeCycle(mArtifactName);
+        final ModelContainer lifeCycle = repo.getModelLifeCycle(mArtifactName);
         lifeCycle.attachAsRemoteFreshener(
             kiji, policyClassName, parameters, override, instantiate, setup);
         getPrintStream().printf("Freshener attached to column: %s with policy: %s and model: %s",
-            lifeCycle.getEnvironment().getScoreEnvironment().getOutputSpec().getOutputColumn(),
+            // TODO: ajprax - verify that this column name is correct
+            lifeCycle.getModelContainer().getColumnName(),
             policyClassName,
             mArtifactName.getFullyQualifiedName());
         return SUCCESS;

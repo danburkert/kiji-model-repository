@@ -27,7 +27,7 @@ import com.google.common.collect.Sets;
 import org.kiji.common.flags.Flag;
 import org.kiji.modelrepo.ArtifactName;
 import org.kiji.modelrepo.KijiModelRepository;
-import org.kiji.modelrepo.ModelLifeCycle;
+import org.kiji.modelrepo.ModelContainer;
 import org.kiji.schema.KConstants;
 import org.kiji.schema.Kiji;
 import org.kiji.schema.KijiURI;
@@ -96,9 +96,9 @@ public final class UpdateModelRepoTool extends BaseTool implements KijiModelRepo
           mArtifact.getVersion(),
           mProductionReady,
           mMessage);
-      ModelLifeCycle model = kmr.getModelLifeCycle(
+      ModelContainer model = kmr.getModelLifeCycle(
           mArtifact,
-          Sets.newHashSet(ModelLifeCycle.PRODUCTION_READY_KEY, ModelLifeCycle.MESSAGES_KEY));
+          Sets.newHashSet(ModelContainer.PRODUCTION_READY_KEY, ModelContainer.MESSAGES_KEY));
       getPrintStream().println(model);
     } finally {
       kmr.close();

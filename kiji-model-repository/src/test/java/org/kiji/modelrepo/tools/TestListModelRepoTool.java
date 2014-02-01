@@ -31,10 +31,9 @@ import com.google.common.io.Files;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.kiji.modeling.avro.AvroModelDefinition;
-import org.kiji.modeling.avro.AvroModelEnvironment;
 import org.kiji.modelrepo.KijiModelRepository;
-import org.kiji.modelrepo.ModelLifeCycle;
+import org.kiji.modelrepo.ModelContainer;
+import org.kiji.modelrepo.avro.KijiModelContainer;
 import org.kiji.schema.EntityId;
 import org.kiji.schema.Kiji;
 import org.kiji.schema.KijiTable;
@@ -65,37 +64,37 @@ public class TestListModelRepoTool extends KijiToolTest {
     final EntityId incompleteModel = table.getEntityId("org.kiji.fake.incompletemodel", "1.0.0");
 
     // Write locations
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 1L, "nonexistent.jar");
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 2L, "nonexistent.jar");
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 3L, "nonexistent.jar");
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 4L, "nonexistent.jar");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 4L, "nonexistent.jar");
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.LOCATION_KEY, 4L, "nonexistent.jar");
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 1L, "nonexistent.jar");
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 2L, "nonexistent.jar");
+    writer.put(recommend, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 3L, "nonexistent.jar");
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 4L, "nonexistent.jar");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 4L, "nonexistent.jar");
+    writer.put(incompleteModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.LOCATION_KEY, 4L, "nonexistent.jar");
 
     // Set uploaded flags.
     // The ModelArtifact.UPLOADED_KEY flags must persist at every entry from the birth of a record.
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 1L, true);
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 2L, true);
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 4L, true);
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 4L, true);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 4L, true);
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.UPLOADED_KEY, 4L, false);
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 1L, true);
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 2L, true);
+    writer.put(recommend, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 4L, true);
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 4L, true);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 4L, true);
+    writer.put(incompleteModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.UPLOADED_KEY, 4L, false);
 
     // Read fake test definition and write to all the entries.
     final File definitionFile =
-        new File("src/test/resources/org/kiji/samplelifecycle/model_definition.json");
+        new File("src/test/resources/org/kiji/samplelifecycle/model_container.json");
     final BufferedReader definitionReader = new BufferedReader(new FileReader(definitionFile));
     String line;
     String definitionJson = "";
@@ -103,97 +102,75 @@ public class TestListModelRepoTool extends KijiToolTest {
       definitionJson += line;
     }
     definitionReader.close();
-    final AvroModelDefinition modelDefinition = (AvroModelDefinition)
-        FromJson.fromJsonString(definitionJson, AvroModelDefinition.SCHEMA$);
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 1L, modelDefinition);
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 2L, modelDefinition);
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 3L, modelDefinition);
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 4L, modelDefinition);
+    final KijiModelContainer modelDefinition = (KijiModelContainer)
+        FromJson.fromJsonString(definitionJson, KijiModelContainer.getClassSchema());
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 1L, modelDefinition);
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 2L, modelDefinition);
+    writer.put(recommend, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 3L, modelDefinition);
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 4L, modelDefinition);
     // Give incomplete model a definition since every model must have a definition.
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 5L, modelDefinition);
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.DEFINITION_KEY, 5L, modelDefinition);
-
-    // Read fake environment test definition and write to all the entries
-    final File environmentFile =
-        new File("src/test/resources/org/kiji/samplelifecycle/model_environment.json");
-    final BufferedReader environmentReader = new BufferedReader(new FileReader(environmentFile));
-    String environmentJson = "";
-    while ((line = environmentReader.readLine()) != null) {
-      environmentJson += line;
-    }
-    environmentReader.close();
-    final AvroModelEnvironment modelEnvironment = (AvroModelEnvironment)
-        FromJson.fromJsonString(environmentJson, AvroModelEnvironment.SCHEMA$);
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.ENVIRONMENT_KEY, 1L, modelEnvironment);
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.ENVIRONMENT_KEY, 2L, modelEnvironment);
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.ENVIRONMENT_KEY, 3L, modelEnvironment);
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.ENVIRONMENT_KEY, 4L, modelEnvironment);
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.ENVIRONMENT_KEY, 4L, modelEnvironment);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 5L, modelDefinition);
+    writer.put(incompleteModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MODEL_CONTAINER_KEY, 5L, modelDefinition);
 
     // Write a few messages and production_ready flags.
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 1L, "Website uses linear regression scorer.");
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 1L, true);
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 2L, "Turned off old linear regression scorer.");
-    writer.put(linRegScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 2L, false);
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 2L, "Linear regression scorer was updated.");
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 2L, true);
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 3L, "Linear regression is outdated");
-    writer.put(linRegScoreNew, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 3L, false);
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 3L, "Brand new recommendation engine online");
-    writer.put(recommend, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 3L, true);
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 4L, "FraudScore implemented.");
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 4L, true);
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 4000L, "FraudScore functioned during cyberattack.");
-    writer.put(fraudScore, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 8000L, "FraudScore failed to detect new attacks.");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 5L, "Should never be implemented.");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 5L, false);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 6L, true);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 7L, false);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 8L, "Random comment.");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 9L, "Random comment.");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 10L, true);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 11L, false);
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 11L, "Random comment.");
-    writer.put(badModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 12L, "Random comment.");
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.PRODUCTION_READY_KEY, 11L, false);
-    writer.put(incompleteModel, ModelLifeCycle.MODEL_REPO_FAMILY,
-        ModelLifeCycle.MESSAGES_KEY, 11L, "Random comment.");
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 1L, "Website uses linear regression scorer.");
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 1L, true);
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 2L, "Turned off old linear regression scorer.");
+    writer.put(linRegScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 2L, false);
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 2L, "Linear regression scorer was updated.");
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 2L, true);
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 3L, "Linear regression is outdated");
+    writer.put(linRegScoreNew, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 3L, false);
+    writer.put(recommend, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 3L, "Brand new recommendation engine online");
+    writer.put(recommend, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 3L, true);
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 4L, "FraudScore implemented.");
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 4L, true);
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 4000L, "FraudScore functioned during cyberattack.");
+    writer.put(fraudScore, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 8000L, "FraudScore failed to detect new attacks.");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 5L, "Should never be implemented.");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 5L, false);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 6L, true);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 7L, false);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 8L, "Random comment.");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 9L, "Random comment.");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 10L, true);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 11L, false);
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 11L, "Random comment.");
+    writer.put(badModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 12L, "Random comment.");
+    writer.put(incompleteModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.PRODUCTION_READY_KEY, 11L, false);
+    writer.put(incompleteModel, ModelContainer.MODEL_REPO_FAMILY,
+        ModelContainer.MESSAGES_KEY, 11L, "Random comment.");
 
     // Close table.
     writer.close();
